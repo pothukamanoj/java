@@ -1,0 +1,42 @@
+name: Deploy Java App to AWS EC2
+
+on:
+  push:
+    branches:
+      - main  # Change this if your branch is different
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Docker image
+        run: docker build -t java-app .
+
+      - name: Save Docker image as a tar file
+        run: docker save -o java-app.tar java-app
+
+      - name: Copy Docker image to AWS EC2
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ec2-user
+          key: ${{ secrets.EC2_SSH_KEY }}
+          source: "java-app.tar"
+          target: "/home/ec2-user"
+
+      - name: SSH into EC2 and deploy the container
+        uses: appleboy/ssh-action@v0.1.7
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ec2-user
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            docker load -i /home/ec2-user/java-app.tar
+            docker run -d --name java-app java-app
